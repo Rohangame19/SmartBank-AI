@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>SmartBank Ai-Dashboard</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<h1>SmartBank Dashboard</h1>
+
+<div class="layout">
+<div class="left-column">
+<h2>Account</h2>
+<input type="number" id="acctId" placeholder="Account ID">
+<button onclick="loadAccount()">Look up balance</button>
+<p>Balance: <span id="balanceValue">$0.00</span></p>
+
+<input type="number" id="amountInput" placeholder="Amount">
+<button onclick="doTransaction('deposit')">Deposit</button>
+<button onclick="doTransaction('withdraw')">Withdraw</button>
+
+
+<h2>Create new account</h2>
+<input type="text" id="newName" placeholder="Name">
+<input type="text" id="newEmail" placeholder="Email">
+<input type="number" id="newBalance" placeholder="Starting balance">
+<button onclick="createAccount()">Create account</button>
+</div>
+
+<div class="right-column">
+<h2>Ask AI</h2>
+<div id="chatBox"></div>
+<input type="text" id="chatInput" placeholder="Ask a banking question...">
+<button onclick="sendQuestion()">Ask</button>
+</div>
+</div>
+
+<script>
+function loadAccount() {
+  var id = document.getElementById('acctId').value;
+  if (!id) { alert('Enter an account ID first.'); return; }
+
+  fetch('/account/' + id)
+    .then(res => res.json())
+    .then(data => {
+      document.getElementById('balanceValue').textContent = '$' + data.balance;
+    })
+    .catch(() => alert('Could not find account.'));
+}
+
+function doTransaction(type) {
+  var id = document.getElementById('acctId').value;
+  var amount = document.getElementById('amountInput').value;
+  if (!id || !amount) { alert('Enter account ID and amount.'); return; }
+
+  fetch('/account/' + id + '/' + type + '?amount=' + amount, { method: 'POST' })
+    .then(res => res.json())
+    .then(data => {
+      document.getElementById('balanceValue').textContent = '$' + data.balance;
+      alert(type + ' successful.');
+    })
+    .catch(() => alert(type + ' failed.'));
+}
+
+function createAccount() {
+  var name = document.getElementById('newName').value;
+  var email = document.getElementById('newEmail').value;
+  var balance = document.getElementById('newBalance').value || 0;
+
+  fetch('/account', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: name, email: email, balance: Number(balance) })
+  })
+    .then(res => res.json())
+    .then(data => {
+      document.getElementById('acctId').value = data.id;
+      document.getElementById('balanceValue').textContent = '$' + data.balance;
+      alert('Account created: #' + data.id);
+    })
+    .catch(() => alert('Could not create account.'));
+}
+
+
+function formatAiText(text) {
+	  text = text.replace(/^### (.*)$/gm, '<h4>$1</h4>');
+	  text = text.replace(/^## (.*)$/gm, '<h3>$1</h3>');
+	  text = text.replace(/^# (.*)$/gm, '<h2>$1</h2>');
+
+	  text = text.replace(/\\(.?)\\*/g, '<b>$1</b>');
+
+	  text = text.replace(/^\* (.*)$/gm, '<li>$1</li>');
+	  text = text.replace(/(<li>.*<\/li>)/gs, '<ul>$1</ul>');
+
+	  text = text.replace(/\n/g, '<br>');
+
+	  return text;
+	}
+	
+function sendQuestion() {
+  var input = document.getElementById('chatInput');
+  var question = input.value.trim();
+  if (!question) return;
+
+  var chatBox = document.getElementById('chatBox');
+  chatBox.innerHTML += '<p><b>You:</b> ' + question + '</p>';
+  input.value = '';
+
+  fetch('/ai/ask?question=' + encodeURIComponent(question), { method: 'POST' })
+    .then(res => res.text())
+    .then(text => {
+      chatBox.innerHTML += '<p><b>AI:</b> ' + formatAiText(text) + '</p>';
+    })
+    .catch(() => {
+      chatBox.innerHTML += '<p><b>AI:</b> Error getting response.</p>';
+    });
+}
+</script>
+
+</body>
+</html>
